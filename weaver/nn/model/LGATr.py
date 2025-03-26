@@ -1,5 +1,7 @@
 import torch
 from torch import nn
+from torch_geometric.nn.aggr import MeanAggregation
+from xformers.ops.fmha import BlockDiagonalMask
 
 from lgatr import (
     LGATr,
@@ -38,6 +40,7 @@ class LGATrWrapper(nn.Module):
         dropout_prob: float = None,
         # time/memory configurations
         checkpoint_blocks: bool = False,
+        use_xformers: bool = True,
         # gatr configurations
         use_fully_connected_subgroup: bool = True,
         mix_pseudoscalar_into_scalar: bool = True,
@@ -129,6 +132,10 @@ class LGATrWrapper(nn.Module):
         in_mv_channels = 1
         self.global_token = global_token
         self.spurion_token = spurion_token
+
+        self.use_xformers = use_xformers
+        if self.use_xformers and not self.global_token:
+            self.aggregator = MeanAggregation()
 
         num_spurions = get_num_spurions(
             beam_spurion, add_time_spurion, beam_mirror=beam_mirror
@@ -229,22 +236,44 @@ class LGATrWrapper(nn.Module):
             is_global = torch.zeros_like(s[:, :, 0], dtype=torch.bool)
             is_global[:, 0] = True
 
-        # reshape mask to broadcast correctly
-        mask = mask.bool()
-        attn_mask = mask[:, None, None, :, 0]  # (batch_size, 1, 1, seq_len)
-        attn_kwargs = {"attn_mask": attn_mask}
+        if self.use_xformers:
+            # flatten across batch and sequence dimension
+            mask = mask[:, :, 0]
+            mv = mv[mask].unsqueeze(0)
+            s = s[mask].unsqueeze(0)
+            if self.global_token:
+                is_global = is_global[mask]
+
+            batch = torch.arange(mask.shape[0], device=mask.device)
+            batch = batch.unsqueeze(-1).repeat(1, mask.shape[1])
+            batch = batch[mask]
+
+            materialize = not torch.cuda.is_available()
+            attn_bias = build_xformers_attention_mask(batch, materialize=materialize)
+            attn_kwargs = (
+                {"attn_mask": attn_bias} if materialize else {"attn_bias": attn_bias}
+            )
+        else:
+            # reshape mask to broadcast correctly
+            mask = mask.bool()
+            attn_mask = mask[:, None, None, :, 0]  # (batch_size, 1, 1, seq_len)
+            attn_kwargs = {"attn_mask": attn_mask}
 
         # call network
         out_mv, _ = self.net(mv, s, **attn_kwargs)
         output = extract_scalar(out_mv)[..., 0]  # (batch_size, seq_len, num_classes)
 
         # aggregation
+        output = output[0] if self.use_xformers else output
         if self.global_token:
             output = output[is_global]
         else:
             # mean aggregation
-            output[~mask[:, 0, 0]] = 0.0
-            output = output.mean(dim=1)
+            if self.use_xformers:
+                output = self.aggregator(output, index=batch)
+            else:
+                output[~mask[:, 0, 0]] = 0.0
+                output = output.mean(dim=1)
         return output
 
 
@@ -283,3 +312,31 @@ class LGATrTagger(nn.Module):
             if self.for_inference:
                 output = torch.softmax(output, dim=-1)
             return output
+
+
+def build_xformers_attention_mask(batch, materialize=False):
+    """
+    Construct attention mask that makes sure that objects only attend to each other
+    within the same batch element, and not across batch elements
+
+    Parameters
+    ----------
+    batch: torch.tensor
+        batch object in the torch_geometric.data naming convention
+        contains batch index for each event in a sparse tensor
+    materialize: bool
+        Decides whether a xformers or ('materialized') torch.tensor mask should be returned
+        The xformers mask allows to use the optimized xformers attention kernel, but only runs on gpu
+
+    Returns
+    -------
+    mask: xformers.ops.fmha.attn_bias.BlockDiagonalMask or torch.tensor
+        attention mask, to be used in xformers.ops.memory_efficient_attention
+        or torch.nn.functional.scaled_dot_product_attention
+    """
+    bincounts = torch.bincount(batch).tolist()
+    mask = BlockDiagonalMask.from_seqlens(bincounts)
+    if materialize:
+        # materialize mask to torch.tensor (only for testing purposes)
+        mask = mask.materialize(shape=(len(batch), len(batch))).to(batch.device)
+    return mask
