@@ -95,6 +95,13 @@ class LGATrWrapper(nn.Module):
         checkpoint_blocks : bool
             If True, use torch.utils.checkpoint.checkpoint to save memory
             at the cost of a slower backward pass.
+        use_xformers: bool
+            If True, use the xformers attention backend. Xformers attention
+            supports block-diagonal attention masks, which in turn allows
+            us to process data as sparse tensors instead of zero-padding.
+            This decreases RAM usage by a factor of ~2 and speeds up training.
+            If False, use the torch.nn.functional.scaled_dot_product_attention
+            together with zero-padding, like in ParT.
         use_fully_connected_subgroup : bool
             If True, model is only equivariant with respect to
             the fully connected subgroup of the Lorentz group,
