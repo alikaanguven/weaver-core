@@ -16,3 +16,4 @@ tensorboard>=2.2.0
 lgatr[xformers_attention]
 torch_geometric
 pytorch_optimizer>=3.0.0  # Lion optimizer
+pyarrow
