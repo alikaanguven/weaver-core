@@ -9,7 +9,7 @@ from lgatr import (
     get_spurions,
     gatr_config,
 )
-from .ParticleTransformer import SequenceTrimmer
+from weaver.nn.model.ParticleTransformer import SequenceTrimmer
 
 
 class LGATrWrapper(nn.Module):

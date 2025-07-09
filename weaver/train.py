@@ -607,6 +607,8 @@ def model_setup(args, data_config, device='cpu'):
         network_options['for_inference'] = True
     if args.use_amp:
         network_options['use_amp'] = True
+    print('network_module: ', network_module)
+    print('type(network_module): ', type(network_module))
     model, model_info = network_module.get_model(data_config, **network_options)
     if args.load_model_weights:
         if ':' in args.load_model_weights:
@@ -790,6 +792,13 @@ def save_parquet(args, output_path, scores, labels, observers):
 
 
 def _main(args):
+    for i in range(5):
+        print("-"*80)
+    print("DEBUG: _main(args)")
+    print("args: ")
+    print(args)
+    for i in range(5):
+        print("-"*80)
     _logger.info('args:\n - %s', '\n - '.join(str(it) for it in args.__dict__.items()))
 
     # export to ONNX
@@ -807,7 +816,12 @@ def _main(args):
     training_mode = any(m in args.run_mode for m in ['train', 'val'])
 
     # device
+    for i in range(5):
+        print("-"*80)
+    print('args.gpus: ', args.gpus)
+    print(type(args.gpus))
     if args.gpus:
+        print('Enter if args.gpus:')
         # distributed training
         if args.backend is not None:
             local_rank = args.local_rank
@@ -820,6 +834,7 @@ def _main(args):
             gpus = [int(i) for i in args.gpus.split(',')]
             dev = torch.device(gpus[0])
     else:
+        print('Enter else:')
         gpus = None
         dev = torch.device('cpu')
         try:
@@ -828,6 +843,7 @@ def _main(args):
         except AttributeError:
             pass
 
+    print('dev: ', dev)
     # load data
     if training_mode:
         train_loader, data_config, val_loader, _ = train_load(args)
