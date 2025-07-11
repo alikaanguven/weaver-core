@@ -10,7 +10,7 @@ from weaver.nn.model.ParticleTransformer import *
 from weaver.utils.logger import _logger
 
 import time
-# torch.autograd.set_detect_anomaly(True)
+torch.autograd.set_detect_anomaly(True)
 
 
 class ParticleTransformerDVTagger(nn.Module):
@@ -155,7 +155,9 @@ class ParticleTransformerDVTagger(nn.Module):
 
         with torch.autocast('cuda', enabled=self.use_amp):
             # input embedding
-            x = self.embed(x).masked_fill(~mask.transpose(1, 2), 0)  # (batch_size, seq_len, num_fts)
+            embedded_x = self.embed(x)
+            filled_x = embedded_x.masked_fill(padding_mask.unsqueeze(-1), 0)  # (batch_size, seq_len, num_fts)
+            x = filled_x
             attn_mask = None
             if (v is not None or uu is not None) and self.pair_embed is not None:
                 attn_mask = self.pair_embed(v, uu=uu, mask=mask)  # (batch_size, num_heads, seq_len, seq_len)
@@ -193,7 +195,6 @@ class ParticleTransformerDVTagger(nn.Module):
         # mask: (batch_size, 1, seq_len) -- real particle = 1, padded = 0
         # for pytorch: uu (batch_size, C', num_pairs), uu_idx (batch_size, 2, num_pairs)
         # for onnx: uu (batch_size, C', seq_len, seq_len), uu_idx=None
-
         x, padding_mask = self._forward_encoder(x, v=v, mask=mask, uu=uu, uu_idx=uu_idx)
 
         if self.cls_blocks is None and self.fc is None:

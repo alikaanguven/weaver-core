@@ -261,8 +261,10 @@ class Embed(nn.Module):
         self.input_bn = nn.BatchNorm1d(input_dim) if normalize_input else None
         module_list = []
         for dim in dims:
+            # Only add a pre-LN if there is something to normalise
+            if input_dim > 1:
+                module_list.append(nn.LayerNorm(input_dim))
             module_list.extend([
-                nn.LayerNorm(input_dim),
                 nn.Linear(input_dim, dim),
                 nn.GELU() if activation == 'gelu' else nn.ReLU(),
             ])
@@ -910,7 +912,6 @@ class ParticleTransformer(nn.Module):
                 output = x.transpose(1, 2).contiguous()
                 if self.for_inference:
                     output = torch.softmax(output, dim=1)
-                # print('output:\n', output)
                 return output
 
             x_cls = self._forward_aggregator(x, padding_mask)
@@ -921,7 +922,6 @@ class ParticleTransformer(nn.Module):
             output = self.fc(x_cls)
             if self.for_inference:
                 output = torch.softmax(output, dim=1)
-            # print('output:\n', output)
             return output
 
 

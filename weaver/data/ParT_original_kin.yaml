@@ -27,7 +27,7 @@ inputs:
       length: 8
       pad_mode: constant
       vars: 
-          - vtx_tk_dummy
+          - vtx_dummy
           
    pf_vectors:
       length: 8
