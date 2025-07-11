@@ -22,8 +22,8 @@ weaver                                                                          
   --data-train     "/eos/vbc/group/cms/ang.li/ParT_datasets/stop_M1000_980_ct2_2018_train.parquet"                                                      \
   --data-test      "${DATA_DIR}/stop_*_test.parquet"                                                       \
   --data-config    "${WEAVER_PATH}/data/${MODEL}_kin.yaml"                                                 \
-  --model-prefix   "${OUT_PATH}/models/${MODEL}_kin/{auto}"                                                \
-  --network-config "${WEAVER_PATH}/networks/${MODEL}_config.py" --optimizer-option weight_decay 0.01       \
-  --batch-size 512 --start-lr 1e-8 --num-epochs 20 --optimizer ranger                                      \
-  --num-workers 0                                                                                  \
+  --model-prefix   "${OUT_PATH}/models/${MODEL}_original_kin/{auto}"                                                \
+  --network-config "${WEAVER_PATH}/networks/${MODEL}_config_original.py" --optimizer-option weight_decay 0.01       \
+  --batch-size 512 --start-lr 1e-6 --num-epochs 20 --optimizer ranger                                      \
+  --num-workers 0  --gpus 0                                                                                \
   --log "${OUT_PATH}/logs/train_{auto}.log"

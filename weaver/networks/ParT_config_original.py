@@ -10,13 +10,13 @@ from weaver.nn.model.ParticleTransformer import *
 from weaver.utils.logger import _logger
 
 import time
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
+
 
 class ParticleTransformerDVTagger(nn.Module):
 
     def __init__(self,
                  input_dim,
-                 input_svdim=0,
                  num_classes=None,
                  # network configurations
                  pair_input_type='pp',
@@ -75,7 +75,7 @@ class ParticleTransformerDVTagger(nn.Module):
         if cls_block_params is not None:
             cfg_cls_block.update(cls_block_params)
         _logger.info('cfg_cls_block: %s' % str(cfg_cls_block))
-        # time.sleep(5)
+
         self.embed = Embed(input_dim, embed_dims, activation=activation) if len(embed_dims) > 0 else nn.Identity()
 
         if pair_input_dim is None:
@@ -86,10 +86,6 @@ class ParticleTransformerDVTagger(nn.Module):
             pairwise_lv_type=pair_input_type,
             remove_self_pair=remove_self_pair, use_pre_activation_pair=use_pre_activation_pair,
             for_onnx=for_inference) if pair_embed_dims is not None and pair_input_dim + pair_extra_dim > 0 else None
-        
-        # x_sv will go in here!
-        self.svembed = Embed(input_svdim, embed_dims, activation=activation) if input_svdim > 0 else None
-        
         self.blocks = nn.ModuleList([Block(**cfg_block) for _ in range(num_layers)])
         self.cls_blocks = nn.ModuleList([Block(**cfg_cls_block)
                                         for _ in range(num_cls_layers)]) if num_cls_layers > 0 else None
@@ -191,35 +187,13 @@ class ParticleTransformerDVTagger(nn.Module):
             x_cls = self.norm(cls_tokens)  # (batch, embed_dim)
         return x_cls
 
-    def forward(self, x, v=None, mask=None, x_sv=None, uu=None, uu_idx=None):
+    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None):
         # x: (batch_size, num_fts, seq_len)
         # v: (batch_size, 4, seq_len) [px,py,pz,energy]
         # mask: (batch_size, 1, seq_len) -- real particle = 1, padded = 0
-        # x_sv: (batch_size, num_fts, seq_len=1) e.g. torch.Size([512, 1, 1])
         # for pytorch: uu (batch_size, C', num_pairs), uu_idx (batch_size, 2, num_pairs)
         # for onnx: uu (batch_size, C', seq_len, seq_len), uu_idx=None
-        print('x[0]:\n', x[0], "\n")
-        print('v[0]:\n', v[0], "\n")
-        print('x_sv: ', x_sv)
-        print('mask[0]:\n', mask[0], "\n")
-        print('statistics')
-        print('-'*80)
-        print('max(x): ',     torch.max(x))
-        print('max(v): ',     torch.max(v))
 
-        print('min(x): ',     torch.min(x))
-        print('min(v): ',     torch.min(v))
-
-        
-        if not torch.isfinite(x).all():
-            print('Something not finite in x.')
-        if not torch.isfinite(v).all():
-            print('Something not finite in v.')
-        if x_sv is not None:
-            print("DEBUG: x_sv is set!")
-            if not torch.isfinite(x_sv).all():
-                print('Something not finite in x_sv.')
-        
         x, padding_mask = self._forward_encoder(x, v=v, mask=mask, uu=uu, uu_idx=uu_idx)
 
         if self.cls_blocks is None and self.fc is None:
@@ -230,8 +204,6 @@ class ParticleTransformerDVTagger(nn.Module):
         with torch.autocast('cuda', enabled=self.use_amp):
             # === for segmentation ===
             if self.for_segmentation:
-                # print("=?"*80)
-                # print("In sgemnetation")
                 x = self.norm(x)
                 if self.fc is not None:
                     x = self.fc(x)
@@ -239,19 +211,9 @@ class ParticleTransformerDVTagger(nn.Module):
                 output = x.transpose(1, 2).contiguous()
                 if self.for_inference:
                     output = torch.softmax(output, dim=1)
-                # # print('output:\n', output)
+                # print('output:\n', output)
                 return output
 
-            # add x_sv info into x
-            if x_sv is not None:
-              x_sv = self.svembed(x_sv)       # (N, input_svdim, embed_dim)  e.g. [512, 1, 128]
-              n_svdim = x_sv.size(1)
-              x = torch.cat((x_sv,x),dim=1)   # (N, dim+svdim,   embed_dim)  e.g. [512, 9, 128]
-              # # print(padding_mask.shape)       # torch.Size([512, 8])
-              
-              padding_mask = torch.cat((torch.ones_like(padding_mask[:, :n_svdim]),padding_mask), dim=1)
-              # # print(padding_mask.shape)
-            
             x_cls = self._forward_aggregator(x, padding_mask)
             if self.fc is None:
                 return x_cls
@@ -260,12 +222,7 @@ class ParticleTransformerDVTagger(nn.Module):
             output = self.fc(x_cls)
             if self.for_inference:
                 output = torch.softmax(output, dim=1)
-            print('output.shape: ', output.shape)
-            print('output:\n', output)
-            # time.sleep(3)
-
-            if not torch.isfinite(output).all():
-                 print('Output is not finite')
+            # print('output:\n', output)
             return output
 
 
@@ -274,7 +231,6 @@ def get_model(data_config, **kwargs):
 
     cfg = dict(
         input_dim               = len(data_config.input_dicts['pf_features']),
-        input_svdim             = len(data_config.input_dicts['sv_features']) if 'sv_features' in data_config.input_dicts.keys() else 0,
         num_classes             = len(data_config.label_value),
         
         # network configurations
