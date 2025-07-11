@@ -20,7 +20,7 @@ new_variables:
 
 preprocess:
   method: manual              # auto/manual
-  data_fraction: 0.           # amount of data to calc. mean & scale
+  data_fraction: 0.5           # amount of data to calc. mean & scale
 
 inputs:
    pf_features:

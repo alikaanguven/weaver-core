@@ -234,32 +234,8 @@ def get_model(data_config, **kwargs):
         num_classes             = len(data_config.label_value),
         
         # network configurations
-        pair_input_dim          = 4,
+        # pair_input_dim          = 4,
         pair_extra_dim          = 0,
-        pair_input_type         = 'pp',
-        remove_self_pair        = False,
-        use_pre_activation_pair = False,
-        
-        embed_dims               = (128, 512, 128),
-        pair_embed_dims          = ( 64,  64,  64),
-        
-        num_heads                = 8,
-        num_layers               = 6,
-        num_cls_layers           = 2,
-        block_params             = None,
-        cls_block_params         = None,
-        fc_params                = (),
-        activation               = 'gelu',
-#        dropout                  = 0.1,            # not available at the moment
-        
-        # misc
-        version                  = 1,
-        weight_init              = 'moco',
-        fix_init                 = False,
-        trim                     = True,
-        for_inference            = False,
-        for_segmentation         = False,
-        use_amp                  = False
     )
     cfg.update(**kwargs)
     _logger.info('Model config: %s' % str(cfg))
