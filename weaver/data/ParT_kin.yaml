@@ -1,0 +1,66 @@
+selection:
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   vtx_tk_mask: ak.ones_like(vtx_tk_E)
+   label_bkg: 1-label_llp
+   vtx_tk_pt_log: np.log(vtx_tk_pt)
+   vtx_tk_E_log: np.log(vtx_tk_E)
+   vtx_tk_logptrel: np.log(vtx_tk_pt/vtx_pt)
+   vtx_tk_logerel: np.log(vtx_tk_E/vtx_E)
+   vtx_tk_deltaR: np.hypot(vtx_tk_deta_Lvtx, vtx_tk_dphi_Lvtx)
+   vtx_tk_dxy_th: np.tanh(vtx_tk_dxy)
+   vtx_tk_dz_th: np.tanh(vtx_tk_dz)
+   vtx_tk_pterrratio: vtx_tk_pterr/vtx_tk_pt
+   vtx_dummy:    ak.ones_like(vtx_match)
+   vtx_tk_dummy: ak.ones_like(vtx_tk_E)
+
+preprocess:
+  method: manual                # auto/manual
+  data_fraction: 0.5            # amount of data to calc. mean & scale
+
+inputs:
+   pf_features:
+      length: 8
+      pad_mode: constant
+      vars: 
+          - vtx_tk_dummy
+          
+   pf_vectors:
+      length: 8
+      pad_mode: constant
+      vars: 
+         - [vtx_tk_px,  null]
+         - [vtx_tk_py,  null]
+         - [vtx_tk_pz,  null]
+         - [vtx_tk_E,   null]
+         
+   pf_mask:
+      length: 8
+      pad_mode: constant
+      vars: 
+         - [vtx_tk_mask, null]
+         
+#    sv_features:
+#       length: 1
+#       pad_mode: constant
+#       vars:
+#          - vtx_dummy
+
+labels:
+   ### type can be `simple`, `custom`
+   ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   type: simple
+   value: [label_llp,label_bkg]
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   # type: custom
+   # value: 
+   #    truth_label: label.argmax(1)
+
+observers:
+   - label_llp
+
+weights:

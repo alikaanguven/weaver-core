@@ -1,16 +1,29 @@
 #!/bin/bash
 
-WEAVER_PATH="/users/alikaan.gueven/SDV-ML/L-GATr/weaver-core/weaver"
+# Check if in the correct venv
+# ----
+if [[ "$VIRTUAL_ENV" != "" ]]
+then
+  echo "You are in the virtual environment: ${VIRTUAL_ENV}";
+else
+  echo "Set your virtual environment, and try again.";
+  exit 1;
+fi
 
-# '/eos/vbc/experiments/cms/store/user/lian/CustomNanoAOD_v3/stop_M1000_985_ct20_2018/output/*.root'
-# '/eos/vbc/experiments/cms/store/user/lian/CustomNanoAOD_v3/stop_M1000_980_ct2_2018/output/*.root'
+WEAVER_PATH="${HOME}/SDV-ML/L-GATr/jupyterlab-v4.x_setup/weaver-core/weaver"
+OUT_PATH="/scratch-cbe/users/alikaan.gueven/ML_KAAN/lgatr_outputs"
 
-weaver                                                                                                                      \
-  --data-train     "/eos/vbc/group/cms/ang.li/ParT_datasets/stop_M1000_985_ct20_2018_train.parquet"                         \
-  --data-test      "/eos/vbc/group/cms/ang.li/ParT_datasets/stop_M1000_985_ct20_2018_test.parquet"                          \
-  --data-config    "${WEAVER_PATH}/data/LLP.yaml"                                                                           \
-  --model-prefix   "${WEAVER_PATH}/models/lgatr_kin"                                                                                  \
-  --network-config "${WEAVER_PATH}/networks/LGATr_config.py" --optimizer-option weight_decay 0.01                           \
-  --batch-size 512 --start-lr 5e-3 --num-epochs 20 --optimizer ranger                                                       \
-  --num-workers 0 --gpus 0                                                                                                 \
-  --log logs/train_{auto}.log
+DATA_DIR="/eos/vbc/group/cms/ang.li/ParT_datasets"
+
+MODEL="ParT"
+# MODEL="LGATr"
+
+weaver                                                                                                     \
+  --data-train     "/eos/vbc/group/cms/ang.li/ParT_datasets/stop_M1000_980_ct2_2018_train.parquet"                                                      \
+  --data-test      "${DATA_DIR}/stop_*_test.parquet"                                                       \
+  --data-config    "${WEAVER_PATH}/data/${MODEL}_kin.yaml"                                                 \
+  --model-prefix   "${OUT_PATH}/models/${MODEL}_kin/{auto}"                                                \
+  --network-config "${WEAVER_PATH}/networks/${MODEL}_config.py" --optimizer-option weight_decay 0.01       \
+  --batch-size 512 --start-lr 1e-8 --num-epochs 20 --optimizer ranger                                      \
+  --num-workers 0                                                                                  \
+  --log "${OUT_PATH}/logs/train_{auto}.log"
